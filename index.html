@@ -45,7 +45,7 @@ header p{font-size:0.75rem;color:var(--muted);font-family:'JetBrains Mono',monos
 
 #robotCanvas{width:100%;height:320px;background:#060D1A;border-radius:12px;border:1px solid var(--border);display:block;}
 #graphCanvas{width:100%;height:200px;background:#060D1A;border-radius:10px;border:1px solid var(--border);display:block;}
-#integratorCanvas{width:100%;height:260px;background:#060D1A;border-radius:10px;border:1px solid var(--border);display:block;}
+#znCanvas{width:100%;height:240px;background:#060D1A;border-radius:10px;border:1px solid var(--border);display:block;}
 
 .slider-group{margin-bottom:0.9rem;}
 .slider-label{display:flex;justify-content:space-between;align-items:center;margin-bottom:0.35rem;}
@@ -143,7 +143,7 @@ input[type=range]::-webkit-slider-thumb:hover{transform:scale(1.3);}
 
 <div class="tabs">
   <button class="tab active" onclick="showMainTab('sim')">🤖 Simulation</button>
-  <button class="tab" onclick="showMainTab('integ')">∫ Rôle de l'intégrateur</button>
+  <button class="tab" onclick="showMainTab('zn')">⚙ Ziegler-Nichols</button>
   <button class="tab" onclick="showMainTab('calc')">🧮 Calculateur de gains</button>
 </div>
 
@@ -257,69 +257,108 @@ input[type=range]::-webkit-slider-thumb:hover{transform:scale(1.3);}
 </div>
 
 <!-- ═══════════════════════════════════════════════
-     TAB 2 — RÔLE DE L'INTÉGRATEUR (NOUVEAU)
+     TAB 2 — ZIEGLER-NICHOLS (NOUVEAU)
 ═══════════════════════════════════════════════ -->
-<div id="tabpanel-integ" class="tabpanel">
+<div id="tabpanel-zn" class="tabpanel">
 
   <div class="card">
-    <div class="card-title">∫ Pourquoi le terme intégral est nécessaire</div>
+    <div class="card-title">⚙ Méthode de Ziegler-Nichols — Principe</div>
     <p style="font-size:0.85rem;line-height:1.7;color:#94A3B8;">
-      Un correcteur <strong style="color:var(--cyan)">P seul</strong> ne peut pas annuler une erreur permanente
-      (par exemple un centre de masse légèrement décalé, ou un frottement asymétrique).
-      Il se stabilise avec un <strong style="color:var(--red)">décalage résiduel</strong> — l'erreur statique.
-      Le terme <strong style="color:var(--green)">intégral Ki·∫e·dt</strong> accumule cette erreur dans le temps
-      et augmente la commande jusqu'à ce que l'erreur disparaisse complètement.
+      On retire le terme intégral et le terme dérivé (<strong style="color:var(--cyan)">Ki = Kd = 0</strong>),
+      et on augmente progressivement <strong style="color:var(--cyan)">Kp</strong> jusqu'à obtenir des
+      <strong style="color:var(--orange)">oscillations permanentes</strong> (ni amorties, ni divergentes).
+      On relève alors le <strong style="color:var(--cyan)">gain ultime Ku</strong> (= Kp à cet instant) et la
+      <strong style="color:var(--green)">période d'oscillation Tu</strong>. Des formules empiriques donnent
+      ensuite directement Kp, Ki, Kd.
     </p>
   </div>
 
   <div class="card">
     <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:0.8rem;">
-      <div class="card-title" style="margin:0">📊 Comparaison : avec / sans intégrateur</div>
+      <div class="card-title" style="margin:0">📊 Étape 1 — Trouver Ku par simulation (P seul)</div>
       <div class="btn-row">
-        <button class="btn btn-secondary" onclick="toggleIntegSim()" id="btn-integ-start">▶ Lancer</button>
-        <button class="btn btn-secondary" onclick="resetIntegSim()">↺ Reset</button>
+        <button class="btn btn-secondary" onclick="toggleZnSim()" id="btn-zn-start">▶ Lancer</button>
+        <button class="btn btn-secondary" onclick="resetZnSim()">↺ Reset</button>
       </div>
     </div>
-    <canvas id="integratorCanvas" width="900" height="260"></canvas>
+    <canvas id="znCanvas" width="900" height="240"></canvas>
     <div class="legend">
-      <div class="legend-item"><div class="legend-line" style="background:var(--red)"></div>PD seul (Ki=0) — erreur résiduelle persiste</div>
-      <div class="legend-item"><div class="legend-line" style="background:var(--green)"></div>PID complet — erreur éliminée</div>
+      <div class="legend-item"><div class="legend-line" style="background:var(--cyan)"></div>θ(t) avec P seul (Ki=Kd=0)</div>
       <div class="legend-item"><div class="legend-line" style="background:var(--muted);opacity:0.5"></div>θ = 0° (cible)</div>
     </div>
-  </div>
-
-  <div class="card">
-    <div class="card-title">⚙ Perturbation permanente simulée</div>
-    <p style="font-size:0.8rem;color:#94A3B8;margin-bottom:0.8rem;">
-      On applique un <strong style="color:var(--yellow)">couple constant</strong> (ex: frottement asymétrique,
-      centre de masse mal centré) qui pousse le robot à pencher en permanence. Un correcteur PD doit alors
-      maintenir un angle non-nul pour générer la force qui contre cette perturbation — il ne peut pas revenir
-      exactement à 0°. Le terme intégral, lui, élimine cet écart.
-    </p>
-    <div class="slider-group">
+    <div class="slider-group" style="margin-top:0.8rem;">
       <div class="slider-label">
-        <span class="slider-name" style="color:var(--yellow)">Intensité de la perturbation</span>
-        <span class="slider-val" id="v-bias" style="color:var(--yellow)">6.0</span>
+        <span class="slider-name" style="color:var(--cyan)">Kp testé</span>
+        <span class="slider-val" id="v-znkp" style="color:var(--cyan)">18.7</span>
       </div>
-      <input type="range" id="sl-bias" min="0" max="15" step="0.5" value="6" oninput="updateBias()">
+      <input type="range" id="sl-znkp" min="1" max="60" step="0.1" value="18.7" oninput="updateZnKp()">
+      <div style="font-size:0.68rem;color:var(--muted);margin-top:0.3rem;">
+        Augmente Kp jusqu'à voir des oscillations <strong>d'amplitude constante</strong> (ni amorties, ni croissantes) — c'est Ku.
+      </div>
     </div>
     <div class="metrics-grid" style="margin-top:0.8rem;">
-      <div class="metric"><div class="metric-val" id="integ-err-pd" style="color:var(--red)">—</div><div class="metric-lbl">Erreur résiduelle (PD)</div></div>
-      <div class="metric"><div class="metric-val" id="integ-err-pid" style="color:var(--green)">—</div><div class="metric-lbl">Erreur résiduelle (PID)</div></div>
-      <div class="metric"><div class="metric-val" id="integ-val" style="color:var(--cyan)">0.0</div><div class="metric-lbl">Valeur de ∫e·dt (terme I)</div></div>
+      <div class="metric"><div class="metric-val" id="zn-detected-period" style="color:var(--green)">—</div><div class="metric-lbl">Période mesurée Tu (s)</div></div>
+      <div class="metric"><div class="metric-val" id="zn-amplitude-trend" style="color:var(--orange)">—</div><div class="metric-lbl">Tendance amplitude</div></div>
+      <div class="metric"><div class="metric-val" id="zn-status" style="color:var(--cyan)">—</div><div class="metric-lbl">État du régime</div></div>
+      <div class="metric"><div class="metric-val" id="zn-kpmin" style="color:var(--red)">—</div><div class="metric-lbl">Kp minimum (théorique)</div></div>
+    </div>
+    <div style="font-size:0.68rem;color:var(--muted);margin-top:0.6rem;line-height:1.5;">
+      Avec un modèle linéarisé idéal et un léger frottement réaliste, l'amplitude reste quasi-stable
+      pour tout Kp nettement supérieur au seuil théorique Kp_min — c'est la zone où relever Ku et Tu
+      a un sens. En dessous de ce seuil, le système diverge franchement (le robot tombe).
     </div>
   </div>
 
   <div class="card">
-    <div class="card-title">📐 Ce qui se passe mathématiquement</div>
+    <div class="card-title">🔢 Étape 2 — Calculateur Ziegler-Nichols</div>
+    <p style="font-size:0.8rem;color:#94A3B8;margin-bottom:0.8rem;">
+      Reporte ici les valeurs <strong style="color:var(--cyan)">Ku</strong> et <strong style="color:var(--green)">Tu</strong>
+      relevées ci-dessus (ou ajuste-les manuellement) pour calculer les gains.
+    </p>
+    <div class="calc-grid">
+      <div>
+        <div class="slider-group">
+          <div class="slider-label">
+            <span class="slider-name" style="color:var(--cyan)">Ku — Gain ultime</span>
+            <span class="slider-val" id="zn-ku-val" style="color:var(--cyan)">18.7</span>
+          </div>
+          <input type="range" id="zn-ku" min="1" max="100" step="0.1" value="18.7" oninput="calcZN()">
+        </div>
+        <div class="slider-group">
+          <div class="slider-label">
+            <span class="slider-name" style="color:var(--green)">Tu — Période (s)</span>
+            <span class="slider-val" id="zn-tu-val" style="color:var(--green)">0.99</span>
+          </div>
+          <input type="range" id="zn-tu" min="0.05" max="3" step="0.01" value="0.99" oninput="calcZN()">
+        </div>
+        <button class="btn btn-secondary" style="width:100%;margin-top:0.4rem;font-size:0.72rem;" onclick="useDetectedValues()">↑ Utiliser les valeurs mesurées ci-dessus</button>
+      </div>
+      <div>
+        <div class="info" style="height:100%;">
+          <strong>Ku</strong> = valeur de Kp donnant des oscillations permanentes<br><br>
+          <strong>Tu</strong> = durée d'une oscillation complète, mesurée à l'œil (chronomètre) ou lue ci-dessus
+        </div>
+      </div>
+    </div>
+
+    <div style="margin-top:1.2rem;">
+      <div class="card-title">Résultats selon le type de correcteur</div>
+      <div id="zn-table" style="overflow-x:auto;"></div>
+    </div>
+
+    <div class="btn-row" style="margin-top:1.2rem;">
+      <button class="btn btn-primary" onclick="applyZN('pid')">📲 Tester le PID complet</button>
+      <button class="btn btn-secondary" onclick="applyZN('pd')">Tester le PD seul</button>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="card-title">📐 Justification des formules</div>
     <div class="derivation-box">
-      <div><span class="step">Avec PD seul :</span> à l'équilibre, θ̈ = 0, donc Kp·e + Kd·ė = perturbation constante</div>
-      <div>→ Il faut que <span class="result">e ≠ 0</span> pour générer une commande qui compense la perturbation en permanence</div>
-      <div>→ Le robot se stabilise avec une <span class="result">erreur résiduelle non nulle</span></div>
-      <div style="margin-top:0.6rem;border-top:1px solid var(--border);padding-top:0.6rem;"></div>
-      <div><span class="step">Avec PID :</span> le terme Ki·∫e·dt continue de croître tant que e ≠ 0</div>
-      <div>→ La commande augmente jusqu'à ce que <span class="result">e devienne exactement 0</span></div>
-      <div>→ L'intégrale se stabilise à la valeur exacte nécessaire pour compenser la perturbation</div>
+      <div><span class="step">Constat empirique de Ziegler &amp; Nichols (1942) :</span> au seuil d'oscillation permanente, le système boucle-fermée a deux pôles imaginaires purs ±jω — c'est la limite exacte de stabilité.</div>
+      <div style="margin-top:0.5rem;">À cette limite : <span class="result">Ku</span> caractérise l'amplitude du gain critique, <span class="result">Tu</span> caractérise la fréquence naturelle du système en boucle fermée (ω = 2π/Tu).</div>
+      <div style="margin-top:0.5rem;border-top:1px solid var(--border);padding-top:0.5rem;"></div>
+      <div>Les coefficients (0.6, 1.2, 0.075, etc.) viennent de règles empiriques visant un <span class="result">compromis classique</span> : dépassement d'environ 25%, amortissement rapide en 4-5 oscillations. Ce ne sont pas des valeurs optimales exactes, mais un excellent point de départ avant l'affinage.</div>
     </div>
   </div>
 
@@ -530,11 +569,11 @@ input[type=range]::-webkit-slider-thumb:hover{transform:scale(1.3);}
 // ═══════════════════════════════════════
 function showMainTab(name) {
   document.querySelectorAll('.tab').forEach((t,i) => {
-    t.classList.toggle('active', ['sim','integ','calc'][i] === name);
+    t.classList.toggle('active', ['sim','zn','calc'][i] === name);
   });
   document.querySelectorAll('.tabpanel').forEach(p => p.classList.remove('active'));
   document.getElementById('tabpanel-'+name).classList.add('active');
-  if (name === 'integ') drawIntegGraph();
+  if (name === 'zn') drawZnGraph();
   if (name === 'calc') calcGains();
 }
 
@@ -850,106 +889,140 @@ function applyPreset(kp, ki, kd) {
 }
 
 // ═══════════════════════════════════════
-// TAB 2 — INTEGRATOR DEMO
 // ═══════════════════════════════════════
-let integRunning = false;
-let integFrame = null;
-let integTime = 0;
-let bias = 6; // disturbance intensity (slider value, 0-15)
+// TAB 2 — ZIEGLER-NICHOLS SIMULATION
+// ═══════════════════════════════════════
+let znRunning = false;
+let znFrame = null;
+let znTime = 0;
+let znKp = 18.7;
 
-let stPD = { th:0, thd:0, integral:0, prevErr:0 };
-let stPID = { th:0, thd:0, integral:0, prevErr:0 };
+const Mz=0.5, mz=0.1, lz=0.15, Iz=0.006;
+const denomZ = (Mz+mz)*(Iz+mz*lz*lz) - (mz*lz)*(mz*lz);
+const aCoefZ = (Mz+mz)*mz*g*lz/denomZ;
+const bCoefZ = mz*lz/denomZ;
+const cDampZ = 0.15; // light realistic friction (motor/bearings)
+const zdt = 0.016;
+const ZHIST = 400;
+const KpMinZ = aCoefZ/bCoefZ; // theoretical stability threshold
 
-const IHIST = 400;
-let histPD = new Array(IHIST).fill(0);
-let histPID = new Array(IHIST).fill(0);
+let stZN = { th: 8*Math.PI/180, thd: 0, prevErr: 0 };
+let histZN = new Array(ZHIST).fill(8*Math.PI/180);
+let znCrossings = [];
 
-function updateBias() {
-  bias = parseFloat(document.getElementById('sl-bias').value);
-  document.getElementById('v-bias').textContent = bias.toFixed(1);
+function updateZnKp() {
+  znKp = parseFloat(document.getElementById('sl-znkp').value);
+  document.getElementById('v-znkp').textContent = znKp.toFixed(1);
 }
 
-function resetIntegSim() {
-  stPD = { th: 0, thd:0, integral:0, prevErr:0 };
-  stPID = { th: 0, thd:0, integral:0, prevErr:0 };
-  integTime = 0;
-  histPD = new Array(IHIST).fill(0);
-  histPID = new Array(IHIST).fill(0);
-  drawIntegGraph();
-  document.getElementById('integ-err-pd').textContent = '—';
-  document.getElementById('integ-err-pid').textContent = '—';
-  document.getElementById('integ-val').textContent = '0.0';
+function resetZnSim() {
+  stZN = { th: 8*Math.PI/180, thd: 0, prevErr: -8*Math.PI/180 };
+  znTime = 0;
+  znCrossings = [];
+  histZN = new Array(ZHIST).fill(8*Math.PI/180);
+  drawZnGraph();
+  document.getElementById('zn-detected-period').textContent = '—';
+  document.getElementById('zn-amplitude-trend').textContent = '—';
+  document.getElementById('zn-status').textContent = '—';
+  document.getElementById('zn-kpmin').textContent = KpMinZ.toFixed(2);
 }
 
-function toggleIntegSim() {
-  integRunning = !integRunning;
-  const btn = document.getElementById('btn-integ-start');
-  if (integRunning) {
+function toggleZnSim() {
+  znRunning = !znRunning;
+  const btn = document.getElementById('btn-zn-start');
+  if (znRunning) {
     btn.textContent = '⏸ Pause';
-    integLoop();
+    znLoop();
   } else {
     btn.textContent = '▶ Reprendre';
-    if (integFrame) cancelAnimationFrame(integFrame);
+    if (znFrame) cancelAnimationFrame(znFrame);
   }
 }
 
-function integLoop() {
-  if (!integRunning) return;
-  integStep();
-  integFrame = requestAnimationFrame(integLoop);
+function znLoop() {
+  if (!znRunning) return;
+  znStep();
+  znFrame = requestAnimationFrame(znLoop);
 }
 
-const Mi=0.5, mi=0.1, li=0.15, Ii=0.006;
-const denomI = (Mi+mi)*(Ii+mi*li*li) - (mi*li)*(mi*li);
-const aCoef = (Mi+mi)*mi*g*li/denomI;
-const bCoef = mi*li/denomI;
-const KpI = 12, KdI = 1.2, KiI = 6;
-const idt = 0.016;
+function znStep() {
+  znTime += zdt;
 
-function integStep() {
-  integTime += idt;
+  // P-only controller (Ki = Kd = 0, as required by Ziegler-Nichols step 1)
+  // Includes light realistic friction -cDampZ*thetadot (motor/bearings)
+  const err = -stZN.th;
+  let F = znKp * err;
+  F = Math.max(-25, Math.min(25, F));
+  stZN.prevErr = err;
 
-  // Constant disturbance — direct angular acceleration offset (rad/s²)
-  // e.g. asymmetric friction or off-centered mass
-  const Tdist = bias * 0.3;
+  const thdd = bCoefZ*F + aCoefZ*stZN.th - cDampZ*stZN.thd;
+  stZN.thd += thdd*zdt;
+  stZN.th += stZN.thd*zdt;
+  stZN.th = Math.max(-0.6, Math.min(0.6, stZN.th));
 
-  // ── PD only ──
-  {
-    const err = -stPD.th;
-    const der = (err - stPD.prevErr)/idt;
-    let F = KpI*err + KdI*der;
-    F = Math.max(-25, Math.min(25, F));
-    stPD.prevErr = err;
-    const thdd = bCoef*F + aCoef*stPD.th + Tdist;
-    stPD.thd += thdd*idt;
-    stPD.th += stPD.thd*idt;
-    stPD.th = Math.max(-0.35, Math.min(0.35, stPD.th));
-    histPD.push(stPD.th); histPD.shift();
+  // Detect zero crossings (rising) to measure period
+  const prevVal = histZN[histZN.length-1];
+  if (prevVal < 0 && stZN.th >= 0) {
+    znCrossings.push(znTime);
+    if (znCrossings.length > 6) znCrossings.shift();
   }
 
-  // ── PID ──
-  {
-    const err = -stPID.th;
-    stPID.integral = Math.max(-30, Math.min(30, stPID.integral + err*idt));
-    const der = (err - stPID.prevErr)/idt;
-    let F = KpI*err + KiI*stPID.integral + KdI*der;
-    F = Math.max(-25, Math.min(25, F));
-    stPID.prevErr = err;
-    const thdd = bCoef*F + aCoef*stPID.th + Tdist;
-    stPID.thd += thdd*idt;
-    stPID.th += stPID.thd*idt;
-    stPID.th = Math.max(-0.35, Math.min(0.35, stPID.th));
-    histPID.push(stPID.th); histPID.shift();
-  }
+  histZN.push(stZN.th); histZN.shift();
 
-  drawIntegGraph();
-  document.getElementById('integ-err-pd').textContent = (stPD.th*180/Math.PI).toFixed(2)+'°';
-  document.getElementById('integ-err-pid').textContent = (stPID.th*180/Math.PI).toFixed(2)+'°';
-  document.getElementById('integ-val').textContent = stPID.integral.toFixed(2);
+  drawZnGraph();
+  updateZnMetrics();
 }
 
-function drawIntegGraph() {
-  const canvas = document.getElementById('integratorCanvas');
+function updateZnMetrics() {
+  // Period from crossings
+  if (znCrossings.length >= 3) {
+    const periods = [];
+    for (let i=1;i<znCrossings.length;i++) periods.push(znCrossings[i]-znCrossings[i-1]);
+    const avgPeriod = periods.reduce((a,b)=>a+b,0)/periods.length;
+    document.getElementById('zn-detected-period').textContent = avgPeriod.toFixed(3)+'s';
+  }
+
+  // Amplitude trend: compare max |theta| over two separate windows further apart,
+  // skipping the initial transient, so the decay rate is actually measurable
+  const w1start = 40, w1end = 100;
+  const w2start = ZHIST-100, w2end = ZHIST-10;
+  const amp1 = Math.max(...histZN.slice(w1start, w1end).map(Math.abs));
+  const amp2 = Math.max(...histZN.slice(w2start, w2end).map(Math.abs));
+  const ratio = amp1 > 0.001 ? amp2/amp1 : 1;
+
+  const trendEl = document.getElementById('zn-amplitude-trend');
+  const statusEl = document.getElementById('zn-status');
+  document.getElementById('zn-kpmin').textContent = KpMinZ.toFixed(2);
+
+  if (znKp < KpMinZ * 1.02) {
+    trendEl.textContent = '↗ Divergente';
+    trendEl.style.color = 'var(--red)';
+    statusEl.textContent = '✗ Instable — Kp trop faible';
+    statusEl.style.color = 'var(--red)';
+  } else if (ratio < 0.55) {
+    trendEl.textContent = '↘ Décroissante';
+    trendEl.style.color = 'var(--orange)';
+    statusEl.textContent = 'Amorti — augmente encore Kp';
+    statusEl.style.color = 'var(--orange)';
+  } else {
+    trendEl.textContent = '→ Quasi-constante';
+    trendEl.style.color = 'var(--green)';
+    statusEl.textContent = '✓ Proche de Ku';
+    statusEl.style.color = 'var(--green)';
+  }
+}
+
+function useDetectedValues() {
+  const periodText = document.getElementById('zn-detected-period').textContent;
+  if (periodText === '—') return;
+  const period = parseFloat(periodText);
+  document.getElementById('zn-ku').value = znKp;
+  document.getElementById('zn-tu').value = period;
+  calcZN();
+}
+
+function drawZnGraph() {
+  const canvas = document.getElementById('znCanvas');
   const ctx = canvas.getContext('2d');
   const W = canvas.width, H = canvas.height;
   ctx.clearRect(0,0,W,H);
@@ -959,38 +1032,21 @@ function drawIntegGraph() {
   for (let i=0; i<=10; i++) { const x=i*W/10; ctx.beginPath(); ctx.moveTo(x,0); ctx.lineTo(x,H); ctx.stroke(); }
   for (let i=0; i<=5; i++) { const y=i*H/5; ctx.beginPath(); ctx.moveTo(0,y); ctx.lineTo(W,y); ctx.stroke(); }
 
-  const maxDeg = 18;
+  const maxDeg = 25;
   const toY = v => H/2 - (v / (maxDeg*Math.PI/180)) * (H/2-15);
-
-  // Theoretical PD residual error line: e_ss = Tdist / (b*Kp - a)
-  const TdistTheo = bias * 0.3;
-  const eTheoretical = -TdistTheo / (bCoef*KpI - aCoef);
-  ctx.strokeStyle = 'rgba(255,59,92,0.3)'; ctx.lineWidth = 1; ctx.setLineDash([2,3]);
-  ctx.beginPath(); ctx.moveTo(0,toY(eTheoretical)); ctx.lineTo(W,toY(eTheoretical)); ctx.stroke();
-  ctx.setLineDash([]);
 
   ctx.strokeStyle = 'rgba(255,255,255,0.18)'; ctx.lineWidth = 1.2; ctx.setLineDash([4,4]);
   ctx.beginPath(); ctx.moveTo(0,H/2); ctx.lineTo(W,H/2); ctx.stroke(); ctx.setLineDash([]);
 
-  // PD curve (red)
-  ctx.strokeStyle = '#FF3B5C'; ctx.lineWidth = 2.2;
+  ctx.strokeStyle = '#00D4FF'; ctx.lineWidth = 2.3;
+  ctx.shadowColor = '#00D4FF'; ctx.shadowBlur = 5;
   ctx.beginPath();
-  histPD.forEach((v,i) => { const x = i/IHIST*W, y = toY(v); i===0 ? ctx.moveTo(x,y) : ctx.lineTo(x,y); });
-  ctx.stroke();
-
-  // PID curve (green)
-  ctx.strokeStyle = '#00FF94'; ctx.lineWidth = 2.5;
-  ctx.shadowColor = '#00FF94'; ctx.shadowBlur = 5;
-  ctx.beginPath();
-  histPID.forEach((v,i) => { const x = i/IHIST*W, y = toY(v); i===0 ? ctx.moveTo(x,y) : ctx.lineTo(x,y); });
+  histZN.forEach((v,i) => { const x = i/ZHIST*W, y = toY(v); i===0 ? ctx.moveTo(x,y) : ctx.lineTo(x,y); });
   ctx.stroke(); ctx.shadowBlur = 0;
 
-  // End labels
-  const lastPD = histPD[histPD.length-1], lastPID = histPID[histPID.length-1];
-  ctx.fillStyle = '#FF3B5C'; ctx.font = 'bold 12px JetBrains Mono'; ctx.textAlign = 'left';
-  ctx.fillText((lastPD*180/Math.PI).toFixed(1)+'°', W-75, toY(lastPD)-10);
-  ctx.fillStyle = '#00FF94';
-  ctx.fillText((lastPID*180/Math.PI).toFixed(1)+'°', W-75, toY(lastPID)+18);
+  const lastVal = histZN[histZN.length-1];
+  ctx.fillStyle = '#00D4FF'; ctx.font = 'bold 12px JetBrains Mono'; ctx.textAlign = 'left';
+  ctx.fillText((lastVal*180/Math.PI).toFixed(1)+'°', W-70, toY(lastVal)-10);
 
   ctx.fillStyle = 'rgba(100,116,139,0.8)'; ctx.font = '9px JetBrains Mono'; ctx.textAlign = 'left';
   ctx.fillText('+'+maxDeg+'°', 4, 16);
@@ -1093,10 +1149,71 @@ function applyCalculatedGains() {
   resetSim();
 }
 
+// ═══════════════════════════════════════
+// ZIEGLER-NICHOLS FORMULAS TABLE
+// ═══════════════════════════════════════
+function calcZN() {
+  const Ku = parseFloat(document.getElementById('zn-ku').value);
+  const Tu = parseFloat(document.getElementById('zn-tu').value);
+  document.getElementById('zn-ku-val').textContent = Ku.toFixed(1);
+  document.getElementById('zn-tu-val').textContent = Tu.toFixed(2);
+
+  const configs = [
+    { type:'P seul',       Kp: (0.5*Ku).toFixed(1),  Ki: '0',                    Kd: '0' },
+    { type:'PI',           Kp: (0.45*Ku).toFixed(1), Ki: (0.54*Ku/Tu).toFixed(2), Kd: '0' },
+    { type:'PD',           Kp: (0.8*Ku).toFixed(1),  Ki: '0',                    Kd: (0.1*Ku*Tu).toFixed(2) },
+    { type:'PID classique',Kp: (0.6*Ku).toFixed(1),  Ki: (1.2*Ku/Tu).toFixed(2),  Kd: (0.075*Ku*Tu).toFixed(2) },
+    { type:'PID Pessen',   Kp: (0.7*Ku).toFixed(1),  Ki: (1.75*Ku/Tu).toFixed(2), Kd: (0.105*Ku*Tu).toFixed(2) },
+  ];
+
+  document.getElementById('zn-table').innerHTML = `
+    <table style="width:100%;border-collapse:collapse;font-family:'JetBrains Mono',monospace;font-size:0.78rem;">
+      <thead>
+        <tr style="background:var(--bg3)">
+          <th style="padding:0.6rem;text-align:left;color:var(--muted);border-bottom:1px solid var(--border)">Type</th>
+          <th style="padding:0.6rem;text-align:center;color:var(--cyan);border-bottom:1px solid var(--border)">Kp</th>
+          <th style="padding:0.6rem;text-align:center;color:var(--green);border-bottom:1px solid var(--border)">Ki</th>
+          <th style="padding:0.6rem;text-align:center;color:var(--orange);border-bottom:1px solid var(--border)">Kd</th>
+        </tr>
+      </thead>
+      <tbody>
+        ${configs.map((c,i) => `
+          <tr style="background:${i===3?'rgba(0,212,255,0.05)':'transparent'}">
+            <td style="padding:0.6rem;color:${i===3?'var(--cyan)':'var(--text)'};font-weight:${i===3?'700':'400'}">${c.type}${i===3?' ★':''}</td>
+            <td style="padding:0.6rem;text-align:center;color:var(--cyan)">${c.Kp}</td>
+            <td style="padding:0.6rem;text-align:center;color:var(--green)">${c.Ki}</td>
+            <td style="padding:0.6rem;text-align:center;color:var(--orange)">${c.Kd}</td>
+          </tr>
+        `).join('')}
+      </tbody>
+    </table>
+  `;
+
+  window._znConfigs = configs;
+}
+
+function applyZN(type) {
+  const Ku = parseFloat(document.getElementById('zn-ku').value);
+  const Tu = parseFloat(document.getElementById('zn-tu').value);
+  let Kp, Ki, Kd;
+  if (type === 'pid') {
+    Kp = 0.6*Ku; Ki = 1.2*Ku/Tu; Kd = 0.075*Ku*Tu;
+  } else {
+    Kp = 0.8*Ku; Ki = 0; Kd = 0.1*Ku*Tu;
+  }
+  document.getElementById('sl-kp').value = Math.min(100, Kp);
+  document.getElementById('sl-ki').value = Math.min(30, Ki);
+  document.getElementById('sl-kd').value = Math.min(20, Kd);
+  updateGain('kp'); updateGain('ki'); updateGain('kd');
+  showMainTab('sim');
+  resetSim();
+}
+
 // Init
 resetSim();
 calcGains();
-resetIntegSim();
+resetZnSim();
+calcZN();
 </script>
 </body>
 </html>
