@@ -1,0 +1,1102 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Self-Balancing Robot — Simulation Interactive</title>
+<style>
+@import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;700&family=Syne:wght@400;700;800&display=swap');
+:root {
+  --bg:#0A0F1E; --bg2:#0F1729; --bg3:#162040;
+  --cyan:#00D4FF; --green:#00FF94; --orange:#FF6B2B;
+  --red:#FF3B5C; --purple:#A855F7; --yellow:#FFD60A;
+  --text:#E2E8F0; --muted:#64748B; --border:#1E2D4A;
+}
+*{margin:0;padding:0;box-sizing:border-box;}
+body{background:var(--bg);color:var(--text);font-family:'Syne',sans-serif;min-height:100vh;overflow-x:hidden;}
+body::before{content:'';position:fixed;inset:0;background-image:linear-gradient(rgba(0,212,255,0.03) 1px,transparent 1px),linear-gradient(90deg,rgba(0,212,255,0.03) 1px,transparent 1px);background-size:40px 40px;pointer-events:none;z-index:0;}
+.wrapper{position:relative;z-index:1;max-width:1200px;margin:0 auto;padding:1.5rem;}
+
+header{display:flex;align-items:center;gap:1rem;margin-bottom:1.2rem;padding-bottom:1rem;border-bottom:1px solid var(--border);}
+.logo{width:40px;height:40px;background:linear-gradient(135deg,var(--cyan),var(--purple));border-radius:10px;display:grid;place-items:center;font-size:1.2rem;}
+header h1{font-size:1.4rem;font-weight:800;background:linear-gradient(90deg,var(--cyan),var(--purple));-webkit-background-clip:text;-webkit-text-fill-color:transparent;}
+header p{font-size:0.75rem;color:var(--muted);font-family:'JetBrains Mono',monospace;}
+.status-badge{margin-left:auto;padding:0.3rem 0.9rem;border-radius:20px;font-size:0.75rem;font-weight:700;font-family:'JetBrains Mono',monospace;display:flex;align-items:center;gap:0.4rem;transition:all 0.3s;}
+.badge-stable{background:rgba(0,255,148,0.1);color:var(--green);border:1px solid rgba(0,255,148,0.3);}
+.badge-unstable{background:rgba(255,59,92,0.1);color:var(--red);border:1px solid rgba(255,59,92,0.3);}
+.badge-oscillating{background:rgba(255,107,43,0.1);color:var(--orange);border:1px solid rgba(255,107,43,0.3);}
+.badge-dot{width:6px;height:6px;border-radius:50%;background:currentColor;animation:pulse 1s infinite;}
+@keyframes pulse{0%,100%{opacity:1}50%{opacity:0.3}}
+
+/* Tabs */
+.tabs{display:flex;gap:0.5rem;margin-bottom:1.2rem;flex-wrap:wrap;}
+.tab{padding:0.55rem 1.1rem;border-radius:8px;border:1px solid var(--border);background:var(--bg2);color:var(--muted);cursor:pointer;font-family:'Syne',sans-serif;font-size:0.8rem;font-weight:700;transition:all 0.2s;}
+.tab.active{background:linear-gradient(135deg,rgba(0,212,255,0.15),rgba(168,85,247,0.15));border-color:var(--cyan);color:var(--cyan);}
+.tab:hover:not(.active){border-color:var(--muted);color:var(--text);}
+.tabpanel{display:none;}
+.tabpanel.active{display:block;}
+
+.main-grid{display:grid;grid-template-columns:1fr 360px;gap:1.5rem;}
+.left-col{display:flex;flex-direction:column;gap:1.5rem;}
+.right-col{display:flex;flex-direction:column;gap:1.5rem;}
+
+.card{background:var(--bg2);border:1px solid var(--border);border-radius:14px;padding:1.2rem;}
+.card-title{font-size:0.7rem;font-weight:700;color:var(--cyan);text-transform:uppercase;letter-spacing:0.1em;margin-bottom:1rem;font-family:'JetBrains Mono',monospace;}
+
+#robotCanvas{width:100%;height:320px;background:#060D1A;border-radius:12px;border:1px solid var(--border);display:block;}
+#graphCanvas{width:100%;height:200px;background:#060D1A;border-radius:10px;border:1px solid var(--border);display:block;}
+#integratorCanvas{width:100%;height:260px;background:#060D1A;border-radius:10px;border:1px solid var(--border);display:block;}
+
+.slider-group{margin-bottom:0.9rem;}
+.slider-label{display:flex;justify-content:space-between;align-items:center;margin-bottom:0.35rem;}
+.slider-name{font-size:0.8rem;font-weight:700;font-family:'JetBrains Mono',monospace;}
+.slider-val{font-size:0.85rem;font-weight:700;font-family:'JetBrains Mono',monospace;background:var(--bg3);padding:0.1rem 0.5rem;border-radius:5px;min-width:55px;text-align:center;}
+input[type=range]{width:100%;height:3px;-webkit-appearance:none;background:var(--bg3);border-radius:2px;outline:none;cursor:pointer;}
+input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:14px;height:14px;border-radius:50%;border:2px solid var(--bg);cursor:pointer;transition:transform 0.15s;}
+input[type=range]::-webkit-slider-thumb:hover{transform:scale(1.3);}
+#sl-kp::-webkit-slider-thumb{background:var(--cyan);}
+#sl-ki::-webkit-slider-thumb{background:var(--green);}
+#sl-kd::-webkit-slider-thumb{background:var(--orange);}
+#sl-theta::-webkit-slider-thumb{background:var(--yellow);}
+
+.metrics-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:0.6rem;}
+.metric{background:var(--bg3);border-radius:8px;padding:0.7rem;text-align:center;}
+.metric-val{font-size:1.1rem;font-weight:800;font-family:'JetBrains Mono',monospace;}
+.metric-lbl{font-size:0.6rem;color:var(--muted);margin-top:0.15rem;text-transform:uppercase;}
+
+.btn-row{display:flex;gap:0.6rem;flex-wrap:wrap;}
+.btn{padding:0.55rem 1.1rem;border-radius:8px;border:none;cursor:pointer;font-family:'Syne',sans-serif;font-weight:700;font-size:0.8rem;transition:all 0.2s;}
+.btn-primary{background:linear-gradient(135deg,var(--cyan),var(--purple));color:#000;}
+.btn-primary:hover{transform:translateY(-1px);box-shadow:0 4px 20px rgba(0,212,255,0.3);}
+.btn-secondary{background:var(--bg3);color:var(--text);border:1px solid var(--border);}
+.btn-secondary:hover{border-color:var(--cyan);color:var(--cyan);}
+
+.legend{display:flex;gap:1rem;flex-wrap:wrap;margin-top:0.6rem;}
+.legend-item{display:flex;align-items:center;gap:0.4rem;font-size:0.7rem;color:var(--muted);font-family:'JetBrains Mono',monospace;}
+.legend-line{width:16px;height:2px;border-radius:1px;}
+
+.pid-live{display:grid;grid-template-columns:repeat(3,1fr);gap:0.5rem;margin-top:0.5rem;}
+.pid-term{background:var(--bg3);border-radius:8px;padding:0.6rem;text-align:center;border-top:2px solid;}
+.pid-term-p{border-color:var(--cyan);}
+.pid-term-i{border-color:var(--green);}
+.pid-term-d{border-color:var(--orange);}
+.pid-term-label{font-size:0.65rem;color:var(--muted);font-family:'JetBrains Mono',monospace;}
+.pid-term-val{font-size:0.9rem;font-weight:800;font-family:'JetBrains Mono',monospace;margin-top:0.2rem;}
+
+.perturb-btn{width:100%;padding:0.7rem;background:rgba(255,214,10,0.1);border:1px solid rgba(255,214,10,0.3);border-radius:8px;color:var(--yellow);font-family:'Syne',sans-serif;font-weight:700;font-size:0.82rem;cursor:pointer;transition:all 0.2s;}
+.perturb-btn:hover{background:rgba(255,214,10,0.2);}
+
+.presets{display:grid;grid-template-columns:1fr 1fr;gap:0.5rem;}
+.preset-btn{padding:0.5rem;background:var(--bg3);border:1px solid var(--border);border-radius:7px;color:var(--text);font-family:'JetBrains Mono',monospace;font-size:0.7rem;cursor:pointer;text-align:center;transition:all 0.2s;}
+.preset-btn:hover{border-color:var(--cyan);color:var(--cyan);}
+
+/* Calculator specific */
+.calc-grid{display:grid;grid-template-columns:1fr 1fr;gap:1.5rem;}
+.param-section{margin-bottom:1.4rem;}
+.param-section-title{font-size:0.75rem;font-weight:700;color:var(--purple);text-transform:uppercase;letter-spacing:0.08em;margin-bottom:0.7rem;padding-bottom:0.4rem;border-bottom:1px solid var(--border);font-family:'JetBrains Mono',monospace;}
+.input-group{margin-bottom:0.8rem;}
+.input-label{display:flex;justify-content:space-between;font-size:0.78rem;color:var(--text);margin-bottom:0.3rem;font-family:'JetBrains Mono',monospace;}
+.input-label .unit{color:var(--muted);}
+.input-row{display:flex;gap:0.5rem;align-items:center;}
+.num-input{flex:1;background:var(--bg3);border:1px solid var(--border);border-radius:7px;padding:0.5rem 0.7rem;color:var(--text);font-family:'JetBrains Mono',monospace;font-size:0.85rem;outline:none;transition:border-color 0.2s;}
+.num-input:focus{border-color:var(--cyan);}
+.info-icon{width:18px;height:18px;border-radius:50%;background:var(--bg3);border:1px solid var(--border);display:grid;place-items:center;font-size:0.65rem;color:var(--muted);cursor:help;flex-shrink:0;position:relative;}
+.info-icon:hover{border-color:var(--cyan);color:var(--cyan);}
+.tooltip{position:absolute;bottom:130%;right:0;width:240px;background:#060D1A;border:1px solid var(--cyan);border-radius:8px;padding:0.7rem;font-size:0.7rem;color:var(--text);font-family:'Syne',sans-serif;line-height:1.5;display:none;z-index:10;box-shadow:0 8px 24px rgba(0,0,0,0.4);}
+.info-icon:hover .tooltip{display:block;}
+
+.result-banner{background:linear-gradient(135deg,rgba(0,212,255,0.08),rgba(168,85,247,0.08));border:1px solid rgba(0,212,255,0.25);border-radius:12px;padding:1.3rem;margin-top:1rem;}
+.result-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:0.8rem;margin-top:0.9rem;}
+.result-box{background:var(--bg3);border-radius:10px;padding:0.9rem;text-align:center;border-top:3px solid;}
+.result-box.kp{border-color:var(--cyan);}
+.result-box.ki{border-color:var(--green);}
+.result-box.kd{border-color:var(--orange);}
+.result-box-label{font-size:0.68rem;color:var(--muted);font-family:'JetBrains Mono',monospace;}
+.result-box-val{font-size:1.6rem;font-weight:800;font-family:'JetBrains Mono',monospace;margin-top:0.25rem;}
+.result-box.kp .result-box-val{color:var(--cyan);}
+.result-box.ki .result-box-val{color:var(--green);}
+.result-box.kd .result-box-val{color:var(--orange);}
+
+.derivation-box{background:var(--bg3);border-radius:8px;padding:0.9rem;margin-top:0.6rem;font-family:'JetBrains Mono',monospace;font-size:0.76rem;line-height:1.9;color:#94A3B8;}
+.derivation-box .step{color:var(--cyan);}
+.derivation-box .result{color:var(--green);font-weight:700;}
+
+.warn-box{background:rgba(255,107,43,0.08);border:1px solid rgba(255,107,43,0.25);border-radius:8px;padding:0.7rem 0.9rem;font-size:0.75rem;color:#FDBA74;margin-top:0.7rem;line-height:1.5;}
+
+@media(max-width:800px){.main-grid{grid-template-columns:1fr;}.metrics-grid{grid-template-columns:repeat(3,1fr);}.calc-grid{grid-template-columns:1fr;}}
+</style>
+</head>
+<body>
+<div class="wrapper">
+
+<header>
+  <div class="logo">⚖</div>
+  <div>
+    <h1>Self-Balancing Robot — Simulation Interactive</h1>
+    <p>Visualisation, intégrateur et calcul des gains PID</p>
+  </div>
+  <div id="status-badge" class="status-badge badge-stable">
+    <div class="badge-dot"></div>
+    <span id="status-text">Stable</span>
+  </div>
+</header>
+
+<div class="tabs">
+  <button class="tab active" onclick="showMainTab('sim')">🤖 Simulation</button>
+  <button class="tab" onclick="showMainTab('integ')">∫ Rôle de l'intégrateur</button>
+  <button class="tab" onclick="showMainTab('calc')">🧮 Calculateur de gains</button>
+</div>
+
+<!-- ═══════════════════════════════════════════════
+     TAB 1 — SIMULATION (existant)
+═══════════════════════════════════════════════ -->
+<div id="tabpanel-sim" class="tabpanel active">
+<div class="main-grid">
+
+  <div class="left-col">
+    <div class="card">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:0.8rem;">
+        <div class="card-title" style="margin:0">🤖 Robot en temps réel</div>
+        <div style="font-size:0.75rem;color:var(--muted);font-family:'JetBrains Mono',monospace;">
+          θ = <span id="angle-display" style="color:var(--cyan)">0.0</span>°
+          &nbsp;|&nbsp;
+          u = <span id="output-display" style="color:var(--orange)">0.0</span>
+        </div>
+      </div>
+      <canvas id="robotCanvas" width="800" height="320"></canvas>
+      <div style="display:flex;gap:0.8rem;margin-top:0.8rem;flex-wrap:wrap;">
+        <button class="btn btn-primary" id="btn-start" onclick="toggleSim()">▶ Démarrer</button>
+        <button class="btn btn-secondary" onclick="resetSim()">↺ Reset</button>
+        <button class="perturb-btn" style="flex:1" onclick="perturb()">⚡ Perturbation</button>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-title">📈 Angle θ(t) — Historique</div>
+      <canvas id="graphCanvas" width="800" height="200"></canvas>
+      <div class="legend">
+        <div class="legend-item"><div class="legend-line" style="background:var(--cyan)"></div>θ(t) — angle actuel</div>
+        <div class="legend-item"><div class="legend-line" style="background:var(--green);opacity:0.5"></div>Zone stable (±2°)</div>
+        <div class="legend-item"><div class="legend-line" style="background:var(--orange)"></div>Commande u(t)</div>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-title">📊 Métriques temps réel</div>
+      <div class="metrics-grid">
+        <div class="metric"><div class="metric-val" id="m-angle" style="color:var(--cyan)">0.0°</div><div class="metric-lbl">Angle θ</div></div>
+        <div class="metric"><div class="metric-val" id="m-output" style="color:var(--orange)">0</div><div class="metric-lbl">Commande u</div></div>
+        <div class="metric"><div class="metric-val" id="m-time" style="color:var(--purple)">0.0s</div><div class="metric-lbl">Temps</div></div>
+        <div class="metric"><div class="metric-val" id="m-settle" style="color:var(--green)">—</div><div class="metric-lbl">Établissement</div></div>
+        <div class="metric"><div class="metric-val" id="m-max" style="color:var(--red)">0.0°</div><div class="metric-lbl">Max dépass.</div></div>
+        <div class="metric"><div class="metric-val" id="m-error" style="color:var(--yellow)">0.0°</div><div class="metric-lbl">Erreur</div></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="right-col">
+    <div class="card">
+      <div class="card-title">⚡ Gains PID</div>
+      <div class="slider-group">
+        <div class="slider-label"><span class="slider-name" style="color:var(--cyan)">Kp</span><span class="slider-val" id="v-kp" style="color:var(--cyan)">35.0</span></div>
+        <input type="range" id="sl-kp" min="0" max="100" step="0.5" value="35" oninput="updateGain('kp')">
+      </div>
+      <div class="slider-group">
+        <div class="slider-label"><span class="slider-name" style="color:var(--green)">Ki</span><span class="slider-val" id="v-ki" style="color:var(--green)">5.0</span></div>
+        <input type="range" id="sl-ki" min="0" max="30" step="0.1" value="5" oninput="updateGain('ki')">
+      </div>
+      <div class="slider-group">
+        <div class="slider-label"><span class="slider-name" style="color:var(--orange)">Kd</span><span class="slider-val" id="v-kd" style="color:var(--orange)">2.0</span></div>
+        <input type="range" id="sl-kd" min="0" max="20" step="0.1" value="2" oninput="updateGain('kd')">
+      </div>
+      <div class="slider-group" style="margin-top:0.5rem;padding-top:0.8rem;border-top:1px solid var(--border);">
+        <div class="slider-label"><span class="slider-name" style="color:var(--yellow)">θ₀ initial (°)</span><span class="slider-val" id="v-theta" style="color:var(--yellow)">8.0°</span></div>
+        <input type="range" id="sl-theta" min="1" max="25" step="0.5" value="8" oninput="updateGain('theta')">
+      </div>
+      <div class="slider-group">
+        <div class="slider-label"><span class="slider-name" style="color:#FF8FA3">Perturbation permanente</span><span class="slider-val" id="v-maindist" style="color:#FF8FA3">4.0</span></div>
+        <input type="range" id="sl-maindist" min="0" max="10" step="0.5" value="4" oninput="updateMainDisturbance()">
+        <div style="font-size:0.68rem;color:var(--muted);margin-top:0.3rem;line-height:1.4;">
+          Déséquilibre constant (frottement asymétrique). Avec Ki=0, l'erreur ne revient jamais exactement à 0°.
+        </div>
+      </div>
+      <div class="card-title" style="margin-top:1rem;">🎯 Préréglages</div>
+      <div class="presets">
+        <button class="preset-btn" onclick="applyPreset(0,0,0)">Sans PID</button>
+        <button class="preset-btn" onclick="applyPreset(20,0,0)">P seul</button>
+        <button class="preset-btn" onclick="applyPreset(30,0,1.5)">PD</button>
+        <button class="preset-btn" onclick="applyPreset(35,5,2)">PID ✓</button>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-title">🔍 Termes PID en direct</div>
+      <div class="pid-live">
+        <div class="pid-term pid-term-p"><div class="pid-term-label">P = Kp×e</div><div class="pid-term-val" id="pid-p" style="color:var(--cyan)">0.0</div></div>
+        <div class="pid-term pid-term-i"><div class="pid-term-label">I = Ki×∫e</div><div class="pid-term-val" id="pid-i" style="color:var(--green)">0.0</div></div>
+        <div class="pid-term pid-term-d"><div class="pid-term-label">D = Kd×ė</div><div class="pid-term-val" id="pid-d" style="color:var(--orange)">0.0</div></div>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-title">📐 Équations actives</div>
+      <div style="font-family:'JetBrains Mono',monospace;font-size:0.72rem;line-height:2;color:#94A3B8;">
+        <div>e(t) = 0 − θ = <span id="eq-e" style="color:var(--cyan)">0.00</span>°</div>
+        <div>∫e·dt = <span id="eq-int" style="color:var(--green)">0.00</span></div>
+        <div>de/dt = <span id="eq-der" style="color:var(--orange)">0.00</span></div>
+        <div style="border-top:1px solid var(--border);margin-top:0.3rem;padding-top:0.3rem;">
+          u = <span style="color:var(--cyan)" id="eq-kp">35</span>×<span id="eq-ev" style="color:var(--cyan)">0</span>
+            + <span style="color:var(--green)" id="eq-ki">5</span>×<span id="eq-iv" style="color:var(--green)">0</span>
+            + <span style="color:var(--orange)" id="eq-kd">2</span>×<span id="eq-dv" style="color:var(--orange)">0</span>
+            = <span id="eq-u" style="color:var(--text);font-weight:700">0</span>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+</div>
+
+<!-- ═══════════════════════════════════════════════
+     TAB 2 — RÔLE DE L'INTÉGRATEUR (NOUVEAU)
+═══════════════════════════════════════════════ -->
+<div id="tabpanel-integ" class="tabpanel">
+
+  <div class="card">
+    <div class="card-title">∫ Pourquoi le terme intégral est nécessaire</div>
+    <p style="font-size:0.85rem;line-height:1.7;color:#94A3B8;">
+      Un correcteur <strong style="color:var(--cyan)">P seul</strong> ne peut pas annuler une erreur permanente
+      (par exemple un centre de masse légèrement décalé, ou un frottement asymétrique).
+      Il se stabilise avec un <strong style="color:var(--red)">décalage résiduel</strong> — l'erreur statique.
+      Le terme <strong style="color:var(--green)">intégral Ki·∫e·dt</strong> accumule cette erreur dans le temps
+      et augmente la commande jusqu'à ce que l'erreur disparaisse complètement.
+    </p>
+  </div>
+
+  <div class="card">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:0.8rem;">
+      <div class="card-title" style="margin:0">📊 Comparaison : avec / sans intégrateur</div>
+      <div class="btn-row">
+        <button class="btn btn-secondary" onclick="toggleIntegSim()" id="btn-integ-start">▶ Lancer</button>
+        <button class="btn btn-secondary" onclick="resetIntegSim()">↺ Reset</button>
+      </div>
+    </div>
+    <canvas id="integratorCanvas" width="900" height="260"></canvas>
+    <div class="legend">
+      <div class="legend-item"><div class="legend-line" style="background:var(--red)"></div>PD seul (Ki=0) — erreur résiduelle persiste</div>
+      <div class="legend-item"><div class="legend-line" style="background:var(--green)"></div>PID complet — erreur éliminée</div>
+      <div class="legend-item"><div class="legend-line" style="background:var(--muted);opacity:0.5"></div>θ = 0° (cible)</div>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="card-title">⚙ Perturbation permanente simulée</div>
+    <p style="font-size:0.8rem;color:#94A3B8;margin-bottom:0.8rem;">
+      On applique un <strong style="color:var(--yellow)">couple constant</strong> (ex: frottement asymétrique,
+      centre de masse mal centré) qui pousse le robot à pencher en permanence. Un correcteur PD doit alors
+      maintenir un angle non-nul pour générer la force qui contre cette perturbation — il ne peut pas revenir
+      exactement à 0°. Le terme intégral, lui, élimine cet écart.
+    </p>
+    <div class="slider-group">
+      <div class="slider-label">
+        <span class="slider-name" style="color:var(--yellow)">Intensité de la perturbation</span>
+        <span class="slider-val" id="v-bias" style="color:var(--yellow)">6.0</span>
+      </div>
+      <input type="range" id="sl-bias" min="0" max="15" step="0.5" value="6" oninput="updateBias()">
+    </div>
+    <div class="metrics-grid" style="margin-top:0.8rem;">
+      <div class="metric"><div class="metric-val" id="integ-err-pd" style="color:var(--red)">—</div><div class="metric-lbl">Erreur résiduelle (PD)</div></div>
+      <div class="metric"><div class="metric-val" id="integ-err-pid" style="color:var(--green)">—</div><div class="metric-lbl">Erreur résiduelle (PID)</div></div>
+      <div class="metric"><div class="metric-val" id="integ-val" style="color:var(--cyan)">0.0</div><div class="metric-lbl">Valeur de ∫e·dt (terme I)</div></div>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="card-title">📐 Ce qui se passe mathématiquement</div>
+    <div class="derivation-box">
+      <div><span class="step">Avec PD seul :</span> à l'équilibre, θ̈ = 0, donc Kp·e + Kd·ė = perturbation constante</div>
+      <div>→ Il faut que <span class="result">e ≠ 0</span> pour générer une commande qui compense la perturbation en permanence</div>
+      <div>→ Le robot se stabilise avec une <span class="result">erreur résiduelle non nulle</span></div>
+      <div style="margin-top:0.6rem;border-top:1px solid var(--border);padding-top:0.6rem;"></div>
+      <div><span class="step">Avec PID :</span> le terme Ki·∫e·dt continue de croître tant que e ≠ 0</div>
+      <div>→ La commande augmente jusqu'à ce que <span class="result">e devienne exactement 0</span></div>
+      <div>→ L'intégrale se stabilise à la valeur exacte nécessaire pour compenser la perturbation</div>
+    </div>
+  </div>
+
+</div>
+
+<!-- ═══════════════════════════════════════════════
+     TAB 3 — CALCULATEUR DE GAINS (NOUVEAU)
+═══════════════════════════════════════════════ -->
+<div id="tabpanel-calc" class="tabpanel">
+
+  <div class="card">
+    <div class="card-title">🧮 Calculateur de gains PID théoriques</div>
+    <p style="font-size:0.85rem;line-height:1.7;color:#94A3B8;margin-bottom:1rem;">
+      Entrez les paramètres physiques réels de <strong style="color:var(--cyan)">votre</strong> robot.
+      L'outil calcule les gains Kp, Ki, Kd théoriques à partir du modèle linéarisé,
+      à utiliser comme point de départ avant l'affinage expérimental.
+    </p>
+
+    <div class="calc-grid">
+
+      <!-- Colonne 1 — Paramètres mécaniques -->
+      <div>
+        <div class="param-section">
+          <div class="param-section-title">⚖ Paramètres de masse</div>
+
+          <div class="input-group">
+            <div class="input-label">
+              <span>Masse du corps (M)</span>
+              <span class="unit">kg</span>
+            </div>
+            <div class="input-row">
+              <input type="number" class="num-input" id="p-M" value="0.5" step="0.01" oninput="calcGains()">
+              <div class="info-icon">ⓘ<div class="tooltip">Pesez le robot complet sans les roues (châssis + électronique + batterie). Une balance de cuisine suffit.</div></div>
+            </div>
+          </div>
+
+          <div class="input-group">
+            <div class="input-label">
+              <span>Masse des roues (m)</span>
+              <span class="unit">kg</span>
+            </div>
+            <div class="input-row">
+              <input type="number" class="num-input" id="p-m" value="0.1" step="0.01" oninput="calcGains()">
+              <div class="info-icon">ⓘ<div class="tooltip">Pesez les deux roues ensemble (roue + pneu + moyeu si démontable).</div></div>
+            </div>
+          </div>
+        </div>
+
+        <div class="param-section">
+          <div class="param-section-title">📏 Paramètres géométriques</div>
+
+          <div class="input-group">
+            <div class="input-label">
+              <span>Bras de levier (l)</span>
+              <span class="unit">m</span>
+            </div>
+            <div class="input-row">
+              <input type="number" class="num-input" id="p-l" value="0.15" step="0.01" oninput="calcGains()">
+              <div class="info-icon">ⓘ<div class="tooltip">Distance entre l'axe des roues et le centre de masse du robot (généralement au milieu de la batterie). Mesurez avec une règle.</div></div>
+            </div>
+          </div>
+
+          <div class="input-group">
+            <div class="input-label">
+              <span>Rayon des roues (r)</span>
+              <span class="unit">m</span>
+            </div>
+            <div class="input-row">
+              <input type="number" class="num-input" id="p-r" value="0.03" step="0.005" oninput="calcGains()">
+              <div class="info-icon">ⓘ<div class="tooltip">Rayon de la roue (diamètre ÷ 2). Influence l'inertie des roues et la vitesse de déplacement réelle.</div></div>
+            </div>
+          </div>
+        </div>
+
+        <div class="param-section">
+          <div class="param-section-title">🔌 Paramètres moteur</div>
+
+          <div class="input-group">
+            <div class="input-label">
+              <span>Tension d'alimentation</span>
+              <span class="unit">V</span>
+            </div>
+            <div class="input-row">
+              <input type="number" class="num-input" id="p-volt" value="7.4" step="0.1" oninput="calcGains()">
+              <div class="info-icon">ⓘ<div class="tooltip">Tension de votre batterie (ex: 7.4V pour LiPo 2S). Définit la commande maximale disponible.</div></div>
+            </div>
+          </div>
+
+          <div class="input-group">
+            <div class="input-label">
+              <span>Vitesse max. moteur à vide</span>
+              <span class="unit">tr/min</span>
+            </div>
+            <div class="input-row">
+              <input type="number" class="num-input" id="p-rpm" value="200" step="10" oninput="calcGains()">
+              <div class="info-icon">ⓘ<div class="tooltip">Vitesse nominale du moteur (souvent indiquée sur la datasheet, ex: "200 RPM @ 6V"). Détermine la réactivité maximale du robot.</div></div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Colonne 2 — Paramètres dynamiques + résultats -->
+      <div>
+        <div class="param-section">
+          <div class="param-section-title">🌀 Moment d'inertie</div>
+
+          <div class="input-group">
+            <div class="input-label">
+              <span>Moment d'inertie corps (I)</span>
+              <span class="unit">kg·m²</span>
+            </div>
+            <div class="input-row">
+              <input type="number" class="num-input" id="p-I" value="0.006" step="0.001" oninput="calcGains()">
+              <div class="info-icon">ⓘ<div class="tooltip">Si inconnu, estimez avec I ≈ M×l²/3 pour une tige uniforme, ou laissez la valeur par défaut. Influence directement la dynamique de rotation.</div></div>
+            </div>
+          </div>
+
+          <div class="input-row" style="margin-top:0.3rem;">
+            <button class="btn btn-secondary" style="width:100%;font-size:0.72rem;" onclick="estimateI()">≈ Estimer I automatiquement (M×l²/3)</button>
+          </div>
+        </div>
+
+        <div class="param-section">
+          <div class="param-section-title">📐 Marge de fonctionnement</div>
+
+          <div class="input-group">
+            <div class="input-label">
+              <span>Angle max. attendu</span>
+              <span class="unit">degrés</span>
+            </div>
+            <div class="input-row">
+              <input type="number" class="num-input" id="p-thetamax" value="10" step="1" oninput="calcGains()">
+              <div class="info-icon">ⓘ<div class="tooltip">Plage d'angle dans laquelle le robot doit fonctionner correctement. Plus elle est grande, plus l'approximation linéaire perd en précision.</div></div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Résultats -->
+        <div class="result-banner">
+          <div class="card-title" style="margin-bottom:0.3rem;">✅ Gains PID calculés</div>
+          <div style="font-size:0.72rem;color:var(--muted);font-family:'JetBrains Mono',monospace;">
+            Méthode : placement de pôles sur le modèle linéarisé
+          </div>
+          <div class="result-grid">
+            <div class="result-box kp">
+              <div class="result-box-label">Kp</div>
+              <div class="result-box-val" id="calc-kp">—</div>
+            </div>
+            <div class="result-box ki">
+              <div class="result-box-label">Ki</div>
+              <div class="result-box-val" id="calc-ki">—</div>
+            </div>
+            <div class="result-box kd">
+              <div class="result-box-label">Kd</div>
+              <div class="result-box-val" id="calc-kd">—</div>
+            </div>
+          </div>
+          <div class="btn-row" style="margin-top:1rem;">
+            <button class="btn btn-primary" onclick="applyCalculatedGains()">📲 Tester dans la simulation</button>
+          </div>
+        </div>
+
+        <div class="warn-box" id="calc-warning" style="display:none;">
+          ⚠ Ces valeurs sont théoriques. Elles dépendent fortement de paramètres difficiles à mesurer
+          précisément (frottements, jeu mécanique, latence du capteur). Utilisez-les comme point de
+          départ, puis affinez expérimentalement sur le robot réel.
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="card-title">📐 Détail du calcul (méthode utilisée)</div>
+    <div class="derivation-box" id="calc-derivation">
+      <!-- filled by JS -->
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="card-title">📋 Tableau récapitulatif — tous les paramètres essentiels</div>
+    <table style="width:100%;border-collapse:collapse;font-family:'JetBrains Mono',monospace;font-size:0.74rem;">
+      <thead>
+        <tr style="background:var(--bg3);">
+          <th style="padding:0.5rem;text-align:left;color:var(--cyan);border-bottom:1px solid var(--border);">Paramètre</th>
+          <th style="padding:0.5rem;text-align:left;color:var(--cyan);border-bottom:1px solid var(--border);">Influence sur le PID</th>
+          <th style="padding:0.5rem;text-align:left;color:var(--cyan);border-bottom:1px solid var(--border);">Comment le mesurer</th>
+        </tr>
+      </thead>
+      <tbody style="color:#94A3B8;">
+        <tr><td style="padding:0.5rem;color:var(--text);">M — Masse corps</td><td style="padding:0.5rem;">↑M → ↑Kp nécessaire (plus d'inertie à corriger)</td><td style="padding:0.5rem;">Balance de cuisine</td></tr>
+        <tr><td style="padding:0.5rem;color:var(--text);">m — Masse roues</td><td style="padding:0.5rem;">Modifie le couplage translation/rotation</td><td style="padding:0.5rem;">Balance de précision</td></tr>
+        <tr><td style="padding:0.5rem;color:var(--text);">l — Bras de levier</td><td style="padding:0.5rem;">↑l → robot plus lent à tomber mais plus dur à stopper</td><td style="padding:0.5rem;">Règle, axe roues → centre de masse</td></tr>
+        <tr><td style="padding:0.5rem;color:var(--text);">I — Moment d'inertie</td><td style="padding:0.5rem;">↑I → réponse plus lente, Kd plus grand nécessaire</td><td style="padding:0.5rem;">Calcul ou pendule de torsion</td></tr>
+        <tr><td style="padding:0.5rem;color:var(--text);">Tension batterie</td><td style="padding:0.5rem;">Limite la commande max disponible (saturation)</td><td style="padding:0.5rem;">Multimètre</td></tr>
+        <tr><td style="padding:0.5rem;color:var(--text);">Vitesse moteur (RPM)</td><td style="padding:0.5rem;">Limite Kd utile — au-delà, le moteur sature</td><td style="padding:0.5rem;">Datasheet constructeur</td></tr>
+        <tr><td style="padding:0.5rem;color:var(--text);">Rayon roues</td><td style="padding:0.5rem;">Convertit la rotation moteur en déplacement réel</td><td style="padding:0.5rem;">Pied à coulisse</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+</div>
+
+</div>
+
+<script>
+// ═══════════════════════════════════════
+// MAIN TABS
+// ═══════════════════════════════════════
+function showMainTab(name) {
+  document.querySelectorAll('.tab').forEach((t,i) => {
+    t.classList.toggle('active', ['sim','integ','calc'][i] === name);
+  });
+  document.querySelectorAll('.tabpanel').forEach(p => p.classList.remove('active'));
+  document.getElementById('tabpanel-'+name).classList.add('active');
+  if (name === 'integ') drawIntegGraph();
+  if (name === 'calc') calcGains();
+}
+
+// ═══════════════════════════════════════
+// PHYSICS ENGINE (Simulation tab)
+// ═══════════════════════════════════════
+const g = 9.81;
+const M=0.5, m=0.1, l=0.15, I=0.006;
+const denom = (M+m)*(I+m*l*l) - (m*l)*(m*l);
+
+let state = { x:0, xd:0, th:0, thd:0 };
+let pid = { integral:0, prevErr:0 };
+let Kp=35, Ki=5, Kd=2;
+let theta0 = 8 * Math.PI/180;
+let mainDisturbance = 4; // constant disturbance intensity (0-15), creates steady-state error without I
+let running = false;
+let simTime = 0;
+let dt = 0.016;
+let animFrame = null;
+let maxAngle = 0;
+let settleTime = null;
+let settleStart = null;
+
+const HIST = 300;
+let thetaHist = new Array(HIST).fill(0);
+let outputHist = new Array(HIST).fill(0);
+
+function resetSim() {
+  state = { x:0, xd:0, th:theta0, thd:0 };
+  pid = { integral:0, prevErr:0 };
+  simTime = 0; maxAngle = 0; settleTime = null; settleStart = null;
+  thetaHist = new Array(HIST).fill(0);
+  outputHist = new Array(HIST).fill(0);
+  drawRobot(theta0, 0);
+  drawGraph();
+  updateMetrics(theta0*180/Math.PI, 0, 0, 0);
+}
+
+function perturb() {
+  state.thd += (Math.random() > 0.5 ? 1 : -1) * 0.8;
+}
+
+function toggleSim() {
+  running = !running;
+  const btn = document.getElementById('btn-start');
+  if (running) {
+    btn.textContent = '⏸ Pause';
+    btn.style.background = 'linear-gradient(135deg,var(--orange),var(--red))';
+    loop();
+  } else {
+    btn.textContent = '▶ Reprendre';
+    btn.style.background = 'linear-gradient(135deg,var(--cyan),var(--purple))';
+    if (animFrame) cancelAnimationFrame(animFrame);
+  }
+}
+
+function loop() {
+  if (!running) return;
+  step();
+  animFrame = requestAnimationFrame(loop);
+}
+
+function step() {
+  const err = -state.th;
+  pid.integral = Math.max(-15, Math.min(15, pid.integral + err*dt));
+  const der = (err - pid.prevErr)/dt;
+  let F = Kp*err + Ki*pid.integral + Kd*der;
+  F = Math.max(-25, Math.min(25, F));
+  pid.prevErr = err;
+
+  // Constant disturbance torque — represents real-world asymmetry
+  // (off-centered mass, uneven friction). This is what reveals the
+  // role of the integral term: P and PD alone cannot cancel it.
+  const Tdist = mainDisturbance * 0.3;
+
+  const xdd = ((I+m*l*l)*F + (m*l)*(m*l)*g*state.th) / denom;
+  const thdd = (m*l*F + (M+m)*m*g*l*state.th) / denom + Tdist;
+
+  state.xd += xdd*dt; state.x += state.xd*dt;
+  state.thd += thdd*dt; state.th += state.thd*dt;
+
+  if (Math.abs(state.th) > 1.2) {
+    state.th = state.th > 0 ? 1.2 : -1.2;
+    state.thd *= -0.1;
+  }
+
+  simTime += dt;
+  const thDeg = state.th * 180/Math.PI;
+  maxAngle = Math.max(maxAngle, Math.abs(thDeg));
+
+  if (Math.abs(thDeg) < 2) {
+    if (!settleStart) settleStart = simTime;
+    else if (simTime - settleStart > 0.3 && !settleTime) settleTime = settleStart;
+  } else { settleStart = null; }
+
+  thetaHist.push(state.th); thetaHist.shift();
+  outputHist.push(F/25); outputHist.shift();
+
+  const pTerm = Kp*err, iTerm = Ki*pid.integral, dTerm = Kd*der;
+
+  drawRobot(state.th, state.x);
+  drawGraph();
+  updateMetrics(thDeg, F, simTime, err);
+  updatePIDTerms(pTerm, iTerm, dTerm, F, err, pid.integral, der);
+  updateStatus(thDeg);
+}
+
+function drawRobot(theta, x) {
+  const canvas = document.getElementById('robotCanvas');
+  const ctx = canvas.getContext('2d');
+  const W = canvas.width, H = canvas.height;
+  ctx.clearRect(0,0,W,H);
+  ctx.fillStyle = '#060D1A'; ctx.fillRect(0,0,W,H);
+
+  ctx.strokeStyle = 'rgba(0,212,255,0.06)'; ctx.lineWidth = 1;
+  for (let i=0; i<W; i+=40) { ctx.beginPath(); ctx.moveTo(i,0); ctx.lineTo(i,H); ctx.stroke(); }
+
+  const groundY = H - 60;
+  ctx.strokeStyle = 'rgba(0,212,255,0.3)'; ctx.lineWidth = 2; ctx.setLineDash([8,4]);
+  ctx.beginPath(); ctx.moveTo(0,groundY); ctx.lineTo(W,groundY); ctx.stroke(); ctx.setLineDash([]);
+
+  ctx.fillStyle = 'rgba(0,212,255,0.4)'; ctx.font = '11px JetBrains Mono';
+  ctx.fillText('Sol', 10, groundY-6);
+
+  const baseX = W/2 + Math.sin(theta)*30 + (x % (W/2));
+  const baseY = groundY;
+
+  const glowColor = Math.abs(theta) > 0.3 ? 'rgba(255,59,92,0.3)' : 'rgba(0,212,255,0.2)';
+  ctx.shadowColor = glowColor; ctx.shadowBlur = 15;
+  ctx.strokeStyle = Math.abs(theta) > 0.3 ? '#FF3B5C' : '#00D4FF';
+  ctx.lineWidth = 3;
+  ctx.beginPath(); ctx.arc(baseX - 25, baseY, 20, 0, Math.PI*2); ctx.stroke();
+  ctx.beginPath(); ctx.arc(baseX + 25, baseY, 20, 0, Math.PI*2); ctx.stroke();
+  ctx.shadowBlur = 0;
+
+  ctx.lineWidth = 1.5; ctx.strokeStyle = 'rgba(0,212,255,0.4)';
+  for (let i=0; i<4; i++) {
+    const angle = i * Math.PI/2 + simTime*3;
+    [baseX-25, baseX+25].forEach(wx => {
+      ctx.beginPath(); ctx.moveTo(wx, baseY);
+      ctx.lineTo(wx + Math.cos(angle)*18, baseY + Math.sin(angle)*18); ctx.stroke();
+    });
+  }
+
+  ctx.strokeStyle = '#334155'; ctx.lineWidth = 4;
+  ctx.beginPath(); ctx.moveTo(baseX-25, baseY); ctx.lineTo(baseX+25, baseY); ctx.stroke();
+
+  const bodyLen = 120;
+  const bodyEndX = baseX + Math.sin(theta) * bodyLen;
+  const bodyEndY = baseY - Math.cos(theta) * bodyLen;
+  const bodyColor = Math.abs(theta*180/Math.PI) > 15 ? '#FF3B5C' : Math.abs(theta*180/Math.PI) > 5 ? '#FF6B2B' : '#00D4FF';
+  ctx.shadowColor = bodyColor; ctx.shadowBlur = 20;
+  ctx.strokeStyle = bodyColor; ctx.lineWidth = 6; ctx.lineCap = 'round';
+  ctx.beginPath(); ctx.moveTo(baseX, baseY); ctx.lineTo(bodyEndX, bodyEndY); ctx.stroke();
+  ctx.shadowBlur = 0;
+
+  ctx.save();
+  ctx.translate(baseX, baseY); ctx.rotate(theta);
+  ctx.fillStyle = bodyColor + '22'; ctx.strokeStyle = bodyColor; ctx.lineWidth = 1.5;
+  ctx.beginPath(); ctx.roundRect(-18, -bodyLen, 36, bodyLen, 6); ctx.fill(); ctx.stroke();
+
+  ctx.fillStyle = 'rgba(168,85,247,0.3)'; ctx.strokeStyle = '#A855F7'; ctx.lineWidth = 1;
+  ctx.beginPath(); ctx.roundRect(-10, -bodyLen*0.6-8, 20, 16, 3); ctx.fill(); ctx.stroke();
+  ctx.fillStyle = '#A855F7'; ctx.font = '7px JetBrains Mono'; ctx.textAlign = 'center';
+  ctx.fillText('IMU', 0, -bodyLen*0.6+2);
+  ctx.restore();
+
+  const arcR = 55;
+  ctx.strokeStyle = 'rgba(255,214,10,0.5)'; ctx.lineWidth = 1.5; ctx.setLineDash([3,3]);
+  ctx.beginPath(); ctx.arc(baseX, baseY, arcR, -Math.PI/2, -Math.PI/2 + theta, theta >= 0); ctx.stroke();
+  ctx.setLineDash([]);
+
+  ctx.strokeStyle = 'rgba(255,255,255,0.15)'; ctx.lineWidth = 1; ctx.setLineDash([4,4]);
+  ctx.beginPath(); ctx.moveTo(baseX, baseY-10); ctx.lineTo(baseX, baseY-140); ctx.stroke();
+  ctx.setLineDash([]);
+
+  const midArcAngle = -Math.PI/2 + theta/2;
+  const labelX = baseX + Math.cos(midArcAngle) * (arcR+16);
+  const labelY = baseY + Math.sin(midArcAngle) * (arcR+16);
+  ctx.fillStyle = '#FFD60A'; ctx.font = 'bold 13px JetBrains Mono'; ctx.textAlign = 'center';
+  ctx.fillText((theta*180/Math.PI).toFixed(1)+'°', labelX, labelY);
+
+  const F_visual = Math.max(-25, Math.min(25, Kp*(-state.th) + Kd*(-state.thd)));
+  const arrowLen = F_visual * 4;
+  if (Math.abs(arrowLen) > 5) {
+    ctx.strokeStyle = '#FF6B2B'; ctx.lineWidth = 3;
+    ctx.shadowColor = '#FF6B2B'; ctx.shadowBlur = 8;
+    ctx.beginPath(); ctx.moveTo(baseX, baseY+35); ctx.lineTo(baseX + arrowLen, baseY+35); ctx.stroke();
+    ctx.fillStyle = '#FF6B2B';
+    ctx.beginPath();
+    const dir = arrowLen > 0 ? 1 : -1;
+    ctx.moveTo(baseX + arrowLen, baseY+30); ctx.lineTo(baseX + arrowLen, baseY+40);
+    ctx.lineTo(baseX + arrowLen + dir*10, baseY+35); ctx.fill();
+    ctx.shadowBlur = 0;
+    ctx.fillStyle = '#FF6B2B'; ctx.font = '11px JetBrains Mono'; ctx.textAlign = 'center';
+    ctx.fillText('F', baseX + arrowLen/2, baseY+28);
+  }
+
+  ctx.fillStyle = 'rgba(0,212,255,0.05)'; ctx.strokeStyle = 'rgba(0,212,255,0.1)'; ctx.lineWidth = 1;
+  ctx.beginPath(); ctx.roundRect(10, 10, 160, 65, 8); ctx.fill(); ctx.stroke();
+  ctx.fillStyle = '#64748B'; ctx.font = '10px JetBrains Mono'; ctx.textAlign = 'left';
+  ctx.fillText('t = ' + simTime.toFixed(2) + 's', 18, 28);
+  ctx.fillStyle = '#00D4FF'; ctx.fillText('θ = ' + (theta*180/Math.PI).toFixed(2) + '°', 18, 44);
+  ctx.fillStyle = '#FF6B2B'; ctx.fillText('u = ' + F_visual.toFixed(1), 18, 60);
+
+  const stable = Math.abs(theta*180/Math.PI) < 2;
+  ctx.fillStyle = stable ? 'rgba(0,255,148,0.1)' : 'rgba(255,59,92,0.1)';
+  ctx.strokeStyle = stable ? 'rgba(0,255,148,0.3)' : 'rgba(255,59,92,0.3)'; ctx.lineWidth = 1;
+  ctx.beginPath(); ctx.roundRect(W-130, 10, 120, 30, 8); ctx.fill(); ctx.stroke();
+  ctx.fillStyle = stable ? '#00FF94' : '#FF3B5C'; ctx.font = 'bold 11px JetBrains Mono'; ctx.textAlign = 'center';
+  ctx.fillText(stable ? '✓ STABLE' : '✗ INSTABLE', W-70, 30);
+}
+
+function drawGraph() {
+  const canvas = document.getElementById('graphCanvas');
+  const ctx = canvas.getContext('2d');
+  const W = canvas.width, H = canvas.height;
+  ctx.clearRect(0,0,W,H);
+  ctx.fillStyle = '#060D1A'; ctx.fillRect(0,0,W,H);
+
+  ctx.strokeStyle = 'rgba(255,255,255,0.04)'; ctx.lineWidth = 1;
+  for (let i=0; i<=8; i++) { const x=i*W/8; ctx.beginPath(); ctx.moveTo(x,0); ctx.lineTo(x,H); ctx.stroke(); }
+  for (let i=0; i<=4; i++) { const y=i*H/4; ctx.beginPath(); ctx.moveTo(0,y); ctx.lineTo(W,y); ctx.stroke(); }
+
+  const maxDeg = 30;
+  const toY = v => H/2 - (v / (maxDeg*Math.PI/180)) * (H/2-10);
+
+  const zy1 = toY(2*Math.PI/180), zy2 = toY(-2*Math.PI/180);
+  ctx.fillStyle = 'rgba(0,255,148,0.05)';
+  ctx.fillRect(0, Math.min(zy1,zy2), W, Math.abs(zy2-zy1));
+
+  ctx.strokeStyle = 'rgba(255,255,255,0.12)'; ctx.lineWidth = 1; ctx.setLineDash([4,4]);
+  ctx.beginPath(); ctx.moveTo(0,H/2); ctx.lineTo(W,H/2); ctx.stroke(); ctx.setLineDash([]);
+
+  ctx.strokeStyle = 'rgba(255,107,43,0.5)'; ctx.lineWidth = 1.5;
+  ctx.beginPath();
+  outputHist.forEach((v,i) => { const x = i/HIST*W, y = H/2 - v*(H/2-10); i===0 ? ctx.moveTo(x,y) : ctx.lineTo(x,y); });
+  ctx.stroke();
+
+  ctx.strokeStyle = '#00D4FF'; ctx.lineWidth = 2.5;
+  ctx.shadowColor = '#00D4FF'; ctx.shadowBlur = 6;
+  ctx.beginPath();
+  thetaHist.forEach((v,i) => { const x = i/HIST*W, y = toY(v); i===0 ? ctx.moveTo(x,y) : ctx.lineTo(x,y); });
+  ctx.stroke(); ctx.shadowBlur = 0;
+
+  ctx.fillStyle = 'rgba(100,116,139,0.8)'; ctx.font = '9px JetBrains Mono'; ctx.textAlign = 'left';
+  ctx.fillText('+'+maxDeg+'°', 4, 14);
+  ctx.fillText('0°', 4, H/2-3);
+  ctx.fillText('-'+maxDeg+'°', 4, H-4);
+}
+
+function updateMetrics(thDeg, F, t, err) {
+  document.getElementById('m-angle').textContent = thDeg.toFixed(2)+'°';
+  document.getElementById('m-output').textContent = F.toFixed(1);
+  document.getElementById('m-time').textContent = t.toFixed(1)+'s';
+  document.getElementById('m-max').textContent = maxAngle.toFixed(1)+'°';
+  document.getElementById('m-error').textContent = Math.abs(thDeg).toFixed(2)+'°';
+  document.getElementById('m-settle').textContent = settleTime ? settleTime.toFixed(2)+'s' : '—';
+  document.getElementById('angle-display').textContent = thDeg.toFixed(1);
+  document.getElementById('output-display').textContent = F.toFixed(1);
+}
+
+function updatePIDTerms(pT, iT, dT, F, err, integ, der) {
+  document.getElementById('pid-p').textContent = pT.toFixed(2);
+  document.getElementById('pid-i').textContent = iT.toFixed(2);
+  document.getElementById('pid-d').textContent = dT.toFixed(2);
+  document.getElementById('eq-e').textContent = (err*180/Math.PI).toFixed(2);
+  document.getElementById('eq-int').textContent = integ.toFixed(2);
+  document.getElementById('eq-der').textContent = der.toFixed(2);
+  document.getElementById('eq-kp').textContent = Kp;
+  document.getElementById('eq-ki').textContent = Ki;
+  document.getElementById('eq-kd').textContent = Kd;
+  document.getElementById('eq-ev').textContent = (err*180/Math.PI).toFixed(1);
+  document.getElementById('eq-iv').textContent = integ.toFixed(1);
+  document.getElementById('eq-dv').textContent = der.toFixed(1);
+  document.getElementById('eq-u').textContent = F.toFixed(1);
+}
+
+function updateStatus(thDeg) {
+  const badge = document.getElementById('status-badge');
+  const txt = document.getElementById('status-text');
+  const abs = Math.abs(thDeg);
+  if (abs < 2) { badge.className = 'status-badge badge-stable'; txt.textContent = 'Stable ✓'; }
+  else if (abs < 10) { badge.className = 'status-badge badge-oscillating'; txt.textContent = 'Oscillations'; }
+  else { badge.className = 'status-badge badge-unstable'; txt.textContent = 'Instable ✗'; }
+}
+
+function updateGain(id) {
+  if (id==='kp') { Kp=parseFloat(document.getElementById('sl-kp').value); document.getElementById('v-kp').textContent=Kp.toFixed(1); }
+  if (id==='ki') { Ki=parseFloat(document.getElementById('sl-ki').value); document.getElementById('v-ki').textContent=Ki.toFixed(1); }
+  if (id==='kd') { Kd=parseFloat(document.getElementById('sl-kd').value); document.getElementById('v-kd').textContent=Kd.toFixed(1); }
+  if (id==='theta') {
+    theta0=parseFloat(document.getElementById('sl-theta').value)*Math.PI/180;
+    document.getElementById('v-theta').textContent=parseFloat(document.getElementById('sl-theta').value).toFixed(1)+'°';
+    if (!running) resetSim();
+  }
+}
+
+function updateMainDisturbance() {
+  mainDisturbance = parseFloat(document.getElementById('sl-maindist').value);
+  document.getElementById('v-maindist').textContent = mainDisturbance.toFixed(1);
+}
+
+function applyPreset(kp, ki, kd) {
+  Kp=kp; Ki=ki; Kd=kd;
+  document.getElementById('sl-kp').value=kp;
+  document.getElementById('sl-ki').value=ki;
+  document.getElementById('sl-kd').value=kd;
+  document.getElementById('v-kp').textContent=kp.toFixed(1);
+  document.getElementById('v-ki').textContent=ki.toFixed(1);
+  document.getElementById('v-kd').textContent=kd.toFixed(1);
+  resetSim();
+}
+
+// ═══════════════════════════════════════
+// TAB 2 — INTEGRATOR DEMO
+// ═══════════════════════════════════════
+let integRunning = false;
+let integFrame = null;
+let integTime = 0;
+let bias = 6; // disturbance intensity (slider value, 0-15)
+
+let stPD = { th:0, thd:0, integral:0, prevErr:0 };
+let stPID = { th:0, thd:0, integral:0, prevErr:0 };
+
+const IHIST = 400;
+let histPD = new Array(IHIST).fill(0);
+let histPID = new Array(IHIST).fill(0);
+
+function updateBias() {
+  bias = parseFloat(document.getElementById('sl-bias').value);
+  document.getElementById('v-bias').textContent = bias.toFixed(1);
+}
+
+function resetIntegSim() {
+  stPD = { th: 0, thd:0, integral:0, prevErr:0 };
+  stPID = { th: 0, thd:0, integral:0, prevErr:0 };
+  integTime = 0;
+  histPD = new Array(IHIST).fill(0);
+  histPID = new Array(IHIST).fill(0);
+  drawIntegGraph();
+  document.getElementById('integ-err-pd').textContent = '—';
+  document.getElementById('integ-err-pid').textContent = '—';
+  document.getElementById('integ-val').textContent = '0.0';
+}
+
+function toggleIntegSim() {
+  integRunning = !integRunning;
+  const btn = document.getElementById('btn-integ-start');
+  if (integRunning) {
+    btn.textContent = '⏸ Pause';
+    integLoop();
+  } else {
+    btn.textContent = '▶ Reprendre';
+    if (integFrame) cancelAnimationFrame(integFrame);
+  }
+}
+
+function integLoop() {
+  if (!integRunning) return;
+  integStep();
+  integFrame = requestAnimationFrame(integLoop);
+}
+
+const Mi=0.5, mi=0.1, li=0.15, Ii=0.006;
+const denomI = (Mi+mi)*(Ii+mi*li*li) - (mi*li)*(mi*li);
+const aCoef = (Mi+mi)*mi*g*li/denomI;
+const bCoef = mi*li/denomI;
+const KpI = 12, KdI = 1.2, KiI = 6;
+const idt = 0.016;
+
+function integStep() {
+  integTime += idt;
+
+  // Constant disturbance — direct angular acceleration offset (rad/s²)
+  // e.g. asymmetric friction or off-centered mass
+  const Tdist = bias * 0.3;
+
+  // ── PD only ──
+  {
+    const err = -stPD.th;
+    const der = (err - stPD.prevErr)/idt;
+    let F = KpI*err + KdI*der;
+    F = Math.max(-25, Math.min(25, F));
+    stPD.prevErr = err;
+    const thdd = bCoef*F + aCoef*stPD.th + Tdist;
+    stPD.thd += thdd*idt;
+    stPD.th += stPD.thd*idt;
+    stPD.th = Math.max(-0.35, Math.min(0.35, stPD.th));
+    histPD.push(stPD.th); histPD.shift();
+  }
+
+  // ── PID ──
+  {
+    const err = -stPID.th;
+    stPID.integral = Math.max(-30, Math.min(30, stPID.integral + err*idt));
+    const der = (err - stPID.prevErr)/idt;
+    let F = KpI*err + KiI*stPID.integral + KdI*der;
+    F = Math.max(-25, Math.min(25, F));
+    stPID.prevErr = err;
+    const thdd = bCoef*F + aCoef*stPID.th + Tdist;
+    stPID.thd += thdd*idt;
+    stPID.th += stPID.thd*idt;
+    stPID.th = Math.max(-0.35, Math.min(0.35, stPID.th));
+    histPID.push(stPID.th); histPID.shift();
+  }
+
+  drawIntegGraph();
+  document.getElementById('integ-err-pd').textContent = (stPD.th*180/Math.PI).toFixed(2)+'°';
+  document.getElementById('integ-err-pid').textContent = (stPID.th*180/Math.PI).toFixed(2)+'°';
+  document.getElementById('integ-val').textContent = stPID.integral.toFixed(2);
+}
+
+function drawIntegGraph() {
+  const canvas = document.getElementById('integratorCanvas');
+  const ctx = canvas.getContext('2d');
+  const W = canvas.width, H = canvas.height;
+  ctx.clearRect(0,0,W,H);
+  ctx.fillStyle = '#060D1A'; ctx.fillRect(0,0,W,H);
+
+  ctx.strokeStyle = 'rgba(255,255,255,0.04)'; ctx.lineWidth = 1;
+  for (let i=0; i<=10; i++) { const x=i*W/10; ctx.beginPath(); ctx.moveTo(x,0); ctx.lineTo(x,H); ctx.stroke(); }
+  for (let i=0; i<=5; i++) { const y=i*H/5; ctx.beginPath(); ctx.moveTo(0,y); ctx.lineTo(W,y); ctx.stroke(); }
+
+  const maxDeg = 18;
+  const toY = v => H/2 - (v / (maxDeg*Math.PI/180)) * (H/2-15);
+
+  // Theoretical PD residual error line: e_ss = Tdist / (b*Kp - a)
+  const TdistTheo = bias * 0.3;
+  const eTheoretical = -TdistTheo / (bCoef*KpI - aCoef);
+  ctx.strokeStyle = 'rgba(255,59,92,0.3)'; ctx.lineWidth = 1; ctx.setLineDash([2,3]);
+  ctx.beginPath(); ctx.moveTo(0,toY(eTheoretical)); ctx.lineTo(W,toY(eTheoretical)); ctx.stroke();
+  ctx.setLineDash([]);
+
+  ctx.strokeStyle = 'rgba(255,255,255,0.18)'; ctx.lineWidth = 1.2; ctx.setLineDash([4,4]);
+  ctx.beginPath(); ctx.moveTo(0,H/2); ctx.lineTo(W,H/2); ctx.stroke(); ctx.setLineDash([]);
+
+  // PD curve (red)
+  ctx.strokeStyle = '#FF3B5C'; ctx.lineWidth = 2.2;
+  ctx.beginPath();
+  histPD.forEach((v,i) => { const x = i/IHIST*W, y = toY(v); i===0 ? ctx.moveTo(x,y) : ctx.lineTo(x,y); });
+  ctx.stroke();
+
+  // PID curve (green)
+  ctx.strokeStyle = '#00FF94'; ctx.lineWidth = 2.5;
+  ctx.shadowColor = '#00FF94'; ctx.shadowBlur = 5;
+  ctx.beginPath();
+  histPID.forEach((v,i) => { const x = i/IHIST*W, y = toY(v); i===0 ? ctx.moveTo(x,y) : ctx.lineTo(x,y); });
+  ctx.stroke(); ctx.shadowBlur = 0;
+
+  // End labels
+  const lastPD = histPD[histPD.length-1], lastPID = histPID[histPID.length-1];
+  ctx.fillStyle = '#FF3B5C'; ctx.font = 'bold 12px JetBrains Mono'; ctx.textAlign = 'left';
+  ctx.fillText((lastPD*180/Math.PI).toFixed(1)+'°', W-75, toY(lastPD)-10);
+  ctx.fillStyle = '#00FF94';
+  ctx.fillText((lastPID*180/Math.PI).toFixed(1)+'°', W-75, toY(lastPID)+18);
+
+  ctx.fillStyle = 'rgba(100,116,139,0.8)'; ctx.font = '9px JetBrains Mono'; ctx.textAlign = 'left';
+  ctx.fillText('+'+maxDeg+'°', 4, 16);
+  ctx.fillText('0°', 4, H/2-3);
+  ctx.fillText('-'+maxDeg+'°', 4, H-6);
+}
+
+// ═══════════════════════════════════════
+// TAB 3 — GAIN CALCULATOR
+// ═══════════════════════════════════════
+function estimateI() {
+  const M = parseFloat(document.getElementById('p-M').value) || 0.5;
+  const l = parseFloat(document.getElementById('p-l').value) || 0.15;
+  const Iest = (M * l * l) / 3;
+  document.getElementById('p-I').value = Iest.toFixed(4);
+  calcGains();
+}
+
+function calcGains() {
+  const M = parseFloat(document.getElementById('p-M').value) || 0.5;
+  const m = parseFloat(document.getElementById('p-m').value) || 0.1;
+  const l = parseFloat(document.getElementById('p-l').value) || 0.15;
+  const r = parseFloat(document.getElementById('p-r').value) || 0.03;
+  const volt = parseFloat(document.getElementById('p-volt').value) || 7.4;
+  const rpm = parseFloat(document.getElementById('p-rpm').value) || 200;
+  const I = parseFloat(document.getElementById('p-I').value) || 0.006;
+  const thetamax = parseFloat(document.getElementById('p-thetamax').value) || 10;
+
+  const gloc = 9.81;
+  const denom = (M+m)*(I+m*l*l) - (m*l)*(m*l);
+
+  // Natural frequency of the unstable mode (from linearized model)
+  // theta_ddot = [(M+m) m g l / denom] * theta  -> omega_n^2 = (M+m)*m*g*l/denom
+  const omegaN2 = ((M+m)*m*gloc*l)/denom;
+  const omegaN = Math.sqrt(Math.max(omegaN2, 1e-6));
+
+  // Pole placement target: desired closed loop ~ 4x faster than natural instability,
+  // damping ratio 0.7 (classic compromise)
+  const zeta = 0.7;
+  const omegaDesired = omegaN * 5;
+
+  // Effective "plant gain" relating F to theta_ddot: b = m*l/denom
+  const b = (m*l)/denom;
+  const a = ((M+m)*m*gloc*l)/denom; // = omegaN^2
+
+  // For theta_ddot = b*u + a*theta, with u = -Kp*theta - Kd*theta_dot - Ki*integral
+  // Closed loop (ignoring I for pole placement): theta_ddot + b*Kd*theta_dot + (b*Kp - a)*theta = 0
+  // Match to s^2 + 2*zeta*omegaDesired*s + omegaDesired^2
+  const Kp = (omegaDesired*omegaDesired + a) / b;
+  const Kd = (2*zeta*omegaDesired) / b;
+  const Ki = Kp * 0.15; // empirical ratio for mild integral action, scaled to plant
+
+  // Motor speed limit sanity check
+  const maxLinSpeed = (rpm/60) * 2*Math.PI*r; // m/s
+
+  document.getElementById('calc-kp').textContent = Kp.toFixed(1);
+  document.getElementById('calc-ki').textContent = Ki.toFixed(2);
+  document.getElementById('calc-kd').textContent = Kd.toFixed(2);
+
+  document.getElementById('calc-warning').style.display = 'block';
+
+  document.getElementById('calc-derivation').innerHTML = `
+<span class="step">1. Fréquence naturelle d'instabilité :</span>
+ωn² = (M+m)·m·g·l / Δ = <span class="result">${omegaN2.toFixed(3)}</span> rad²/s²  →  ωn = <span class="result">${omegaN.toFixed(3)}</span> rad/s
+
+<span class="step">2. Déterminant du système :</span>
+Δ = (M+m)(I+ml²) − (ml)² = <span class="result">${denom.toFixed(6)}</span>
+
+<span class="step">3. Pulsation désirée en boucle fermée (placement de pôles, ×5 plus rapide) :</span>
+ωd = 5 × ωn = <span class="result">${omegaDesired.toFixed(3)}</span> rad/s,  amortissement ζ = 0.7
+
+<span class="step">4. Gain effectif de la commande :</span>
+b = m·l / Δ = <span class="result">${b.toFixed(4)}</span>
+
+<span class="step">5. Calcul de Kp (annule l'instabilité + impose ωd) :</span>
+Kp = (ωd² + a) / b = <span class="result">${Kp.toFixed(2)}</span>
+
+<span class="step">6. Calcul de Kd (impose l'amortissement ζ) :</span>
+Kd = 2ζωd / b = <span class="result">${Kd.toFixed(2)}</span>
+
+<span class="step">7. Estimation de Ki (15% de Kp, ajustement empirique) :</span>
+Ki = 0.15 × Kp = <span class="result">${Ki.toFixed(2)}</span>
+
+<span class="step">8. Vitesse linéaire max. des roues (vérification) :</span>
+v_max = (RPM/60) × 2πr = <span class="result">${maxLinSpeed.toFixed(2)}</span> m/s
+  `;
+
+  window._calcGains = { Kp, Ki, Kd };
+}
+
+function applyCalculatedGains() {
+  if (!window._calcGains) return;
+  const { Kp, Ki, Kd } = window._calcGains;
+  const KpC = Math.min(100, Kp), KiC = Math.min(30, Ki), KdC = Math.min(20, Kd);
+  document.getElementById('sl-kp').value = KpC;
+  document.getElementById('sl-ki').value = KiC;
+  document.getElementById('sl-kd').value = KdC;
+  updateGain('kp'); updateGain('ki'); updateGain('kd');
+  showMainTab('sim');
+  resetSim();
+}
+
+// Init
+resetSim();
+calcGains();
+resetIntegSim();
+</script>
+</body>
+</html>
